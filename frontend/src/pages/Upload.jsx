@@ -1,123 +1,117 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import api from '../api/axios';
+import { useAnalysisSocket } from '../hooks/useAnalysisSocket';
 
 function Upload() {
     const [file, setFile] = useState(null);
-    const [progress, setProgress] = useState(0);
-    const [status, setStatus] = useState('idle'); // idle | uploading | success | error
-    const [message, setMessage] = useState('');
-    const [uploadedVideo, setUploadedVideo] = useState(null);
+    const [uploadPct, setUploadPct] = useState(0);
+    const [uploadDone, setUploadDone] = useState(false);
+    const [analysis, setAnalysis] = useState(null);
+    // analysis = { percent, message, status, done }
+    const [error, setError] = useState('');
+    const [videoId, setVideoId] = useState(null);
 
-    const handleFileChange = (e) => {
-        const selected = e.target.files[0];
-
-        // Basic frontend validation before even sending
-        if (!selected) return;
-
-        if (!selected.type.startsWith('video/')) {
-            setMessage('Please select a video file.');
-            return;
+    // Listen for socket events — only update state for OUR video
+    const handleProgress = useCallback((data) => {
+        if (videoId && data.videoId.toString() === videoId.toString()) {
+            setAnalysis(data);
         }
+    }, [videoId]);
 
-        if (selected.size > 100 * 1024 * 1024) {
-            setMessage('File is too large. Max size is 100MB.');
-            return;
-        }
-
-        setFile(selected);
-        setMessage('');
-    };
+    useAnalysisSocket(handleProgress);
 
     const handleUpload = async () => {
-        if (!file) return setMessage('Please select a file first.');
-
-        // FormData is how you send files over HTTP — NOT JSON
+        if (!file) return;
         const formData = new FormData();
-        formData.append('video', file); // 'video' must match upload.single('video') in routes
+        formData.append('video', file);
 
         try {
-            setStatus('uploading');
-            setProgress(0);
+            setError('');
+            setUploadPct(0);
+            setUploadDone(false);
+            setAnalysis(null);
 
             const { data } = await api.post('/videos/upload', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
-
-                // onUploadProgress fires repeatedly as bytes are sent
-                onUploadProgress: (progressEvent) => {
-                    const percent = Math.round(
-                        (progressEvent.loaded * 100) / progressEvent.total
-                    );
-                    setProgress(percent);
-                }
+                onUploadProgress: (e) => setUploadPct(Math.round(e.loaded * 100 / e.total))
             });
 
-            setStatus('success');
-            setUploadedVideo(data.video);
-            setMessage('Video uploaded successfully!');
+            setUploadDone(true);
+            setVideoId(data.video._id); // store ID so socket listener knows which video
             setFile(null);
 
         } catch (err) {
-            setStatus('error');
-            setMessage(err.response?.data?.message || 'Upload failed. Please try again.');
+            setError(err.response?.data?.message || 'Upload failed');
         }
     };
 
+    // Status badge colour
+    const badgeColor = {
+        safe: 'green',
+        flagged: 'red',
+        processing: 'orange',
+        pending: 'gray'
+    };
+
     return (
-        <div style={{ maxWidth: '500px', margin: '40px auto', padding: '0 16px' }}>
+        <div style={{ maxWidth: 500, margin: '40px auto', padding: '0 16px' }}>
             <h2>Upload video</h2>
 
-            <input
-                type="file"
-                accept="video/*"
-                onChange={handleFileChange}
-                disabled={status === 'uploading'}
-            />
+            <input type="file" accept="video/*"
+                onChange={e => setFile(e.target.files[0])} />
 
-            {file && (
-                <p style={{ color: 'gray', fontSize: '14px' }}>
-                    {file.name} — {(file.size / 1024 / 1024).toFixed(2)} MB
-                </p>
-            )}
+            {file && <p style={{ color: 'gray', fontSize: 14 }}>
+                {file.name} — {(file.size / 1024 / 1024).toFixed(2)} MB
+            </p>}
 
-            {/* Progress bar — only visible while uploading */}
-            {status === 'uploading' && (
-                <div style={{ margin: '12px 0' }}>
-                    <div style={{
-                        background: '#e0e0e0',
-                        borderRadius: '4px',
-                        height: '8px',
-                        overflow: 'hidden'
-                    }}>
+            <button onClick={handleUpload} disabled={!file}>Upload</button>
+
+            {error && <p style={{ color: 'red' }}>{error}</p>}
+
+            {/* Upload progress */}
+            {uploadPct > 0 && !uploadDone && (
+                <div style={{ marginTop: 16 }}>
+                    <p style={{ fontSize: 13 }}>Uploading... {uploadPct}%</p>
+                    <div style={{ background: '#e0e0e0', borderRadius: 4, height: 8 }}>
                         <div style={{
-                            width: `${progress}%`,
-                            background: '#378ADD',
-                            height: '100%',
-                            transition: 'width 0.2s ease'
+                            width: `${uploadPct}%`, background: '#378ADD',
+                            height: '100%', borderRadius: 4, transition: 'width 0.2s'
                         }} />
                     </div>
-                    <p style={{ fontSize: '13px', color: 'gray' }}>{progress}% uploaded</p>
                 </div>
             )}
 
-            {message && (
-                <p style={{ color: status === 'error' ? 'red' : 'green' }}>
-                    {message}
-                </p>
-            )}
+            {/* Analysis progress — appears after upload completes */}
+            {uploadDone && (
+                <div style={{
+                    marginTop: 24, padding: 16,
+                    border: '1px solid #e0e0e0', borderRadius: 8
+                }}>
+                    <p style={{ fontWeight: 500 }}>Analysing video...</p>
 
-            <button
-                onClick={handleUpload}
-                disabled={!file || status === 'uploading'}
-            >
-                {status === 'uploading' ? 'Uploading...' : 'Upload video'}
-            </button>
+                    {analysis ? (
+                        <>
+                            <p style={{ fontSize: 13, color: 'gray' }}>{analysis.message}</p>
+                            <div style={{ background: '#e0e0e0', borderRadius: 4, height: 8, margin: '8px 0' }}>
+                                <div style={{
+                                    width: `${analysis.percent}%`, background: '#1D9E75',
+                                    height: '100%', borderRadius: 4, transition: 'width 0.3s'
+                                }} />
+                            </div>
+                            <p style={{ fontSize: 13 }}>{analysis.percent}%</p>
 
-            {/* Show the result after upload */}
-            {uploadedVideo && (
-                <div style={{ marginTop: '24px', padding: '16px', border: '1px solid #e0e0e0', borderRadius: '8px' }}>
-                    <p><strong>Name:</strong> {uploadedVideo.originalName}</p>
-                    <p><strong>Size:</strong> {(uploadedVideo.size / 1024 / 1024).toFixed(2)} MB</p>
-                    <p><strong>Status:</strong> {uploadedVideo.status}</p>
+                            {analysis.done && (
+                                <p style={{
+                                    marginTop: 8, fontWeight: 500,
+                                    color: badgeColor[analysis.status] || 'gray'
+                                }}>
+                                    Result: {analysis.status?.toUpperCase()}
+                                </p>
+                            )}
+                        </>
+                    ) : (
+                        <p style={{ fontSize: 13, color: 'gray' }}>Waiting for analysis to start...</p>
+                    )}
                 </div>
             )}
         </div>
