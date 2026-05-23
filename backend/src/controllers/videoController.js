@@ -2,7 +2,8 @@ const Video = require('../models/Video');
 const path  = require('path');
 const fs    = require('fs');
 
-// POST /api/videos/upload
+const { analyzeVideo } = require('../services/analysisService');
+
 exports.uploadVideo = async (req, res) => {
   try {
     // If Multer rejected the file, req.file won't exist
@@ -18,21 +19,20 @@ exports.uploadVideo = async (req, res) => {
       filepath:     req.file.path,
       size:         req.file.size,
       mimetype:     req.file.mimetype,
-      uploader:     req.user._id,   // from JWT token via protect middleware
+      uploader:     req.user._id,
       status:       'pending'
     });
 
-    // In Phase 4 we'll trigger analysis here — for now just return the video
-    res.status(201).json({
-      message: 'Video uploaded successfully',
-      video
-    });
+    // ── Respond immediately — don't make the user wait ─────────────────────
+    res.status(201).json({ message: 'Video uploaded successfully', video });
+
+    // ── THEN kick off analysis in the background ───────────────────────────
+    // Notice: no 'await' here — this runs after the response is already sent
+    const io = req.app.get('io');
+    analyzeVideo(io, video._id, video.filepath, video.originalName);
 
   } catch (err) {
-    // If DB save fails, clean up the file that was already written to disk
-    if (req.file) {
-      fs.unlink(req.file.path, () => {}); // delete the orphaned file silently
-    }
+    if (req.file) fs.unlink(req.file.path, () => {});
     res.status(500).json({ message: err.message });
   }
 };
