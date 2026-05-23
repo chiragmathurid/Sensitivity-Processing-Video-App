@@ -1,20 +1,25 @@
 const express = require('express');
 const router = express.Router();
-const { protect, requireRole } = require('../middleware/auth'); // import the middleware
+const upload = require('../config/multer');
+const { protect, requireRole } = require('../middleware/auth');
+const {
+    uploadVideo,
+    getVideos,
+    getVideoById,
+    deleteVideo
+} = require('../controllers/videoController');
 
-// You'll create these controller functions in Phase 3
-// For now, add placeholder functions so the file doesn't crash
-const getVideos = (req, res) => res.json({ message: 'getVideos — coming in Phase 3' });
-const uploadVideo = (req, res) => res.json({ message: 'uploadVideo — coming in Phase 3' });
-const deleteVideo = (req, res) => res.json({ message: 'deleteVideo — coming in Phase 3' });
-
-// Anyone logged in can view videos
+// GET  /api/videos          — any logged-in user
 router.get('/', protect, getVideos);
 
-// Only editors and admins can upload
-router.post('/upload', protect, requireRole('editor', 'admin'), uploadVideo);
+// GET  /api/videos/:id      — any logged-in user
+router.get('/:id', protect, getVideoById);
 
-// Only admins can delete
+// POST /api/videos/upload   — editor or admin only
+// upload.single('video') is Multer — 'video' must match the field name in the form
+router.post('/upload', protect, requireRole('editor', 'admin'), upload.single('video'), uploadVideo);
+
+// DELETE /api/videos/:id    — admin only
 router.delete('/:id', protect, requireRole('admin'), deleteVideo);
 
 module.exports = router;
