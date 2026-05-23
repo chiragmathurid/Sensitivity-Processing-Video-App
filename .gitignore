@@ -1,0 +1,13 @@
+# Dependencies
+node_modules/
+
+# Environment files — NEVER commit these
+.env
+backend/.env
+frontend/.env
+
+# Uploaded videos — too large for GitHub
+backend/uploads/
+
+# Build output
+frontend/dist/

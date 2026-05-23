@@ -6,10 +6,10 @@ let socket = null;
 
 const getSocket = () => {
   if (!socket) {
-    socket = io('http://localhost:8000', {
-      reconnection:        true,   // auto-reconnect if connection drops
+    socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:8000', {
+      reconnection: true,   // auto-reconnect if connection drops
       reconnectionAttempts: 5,
-      reconnectionDelay:   1000,
+      reconnectionDelay: 1000,
     });
   }
   return socket;

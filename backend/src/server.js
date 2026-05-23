@@ -24,7 +24,22 @@ const io = new Server(server, {
 app.set('io', io);
 
 // Middleware
-app.use(cors({ origin: 'http://localhost:5173' }));
+app.use(cors({
+  origin: function (origin, callback) {
+    const allowed = [
+      'http://localhost:5173',
+      process.env.CLIENT_URL,
+    ].filter(Boolean);
+
+    if (!origin || allowed.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+}));
+
 app.use(express.json());                             // parse JSON request bodies
 app.use(express.urlencoded({ extended: true }));     // parse form data
 app.use('/api/auth', authRoutes);
@@ -61,7 +76,7 @@ const PORT = process.env.PORT || 8000;
 
 app.use((err, req, res, next) => {
   console.error('FULL ERROR:', err);
-  
+
   if (err instanceof multer.MulterError) {
     if (err.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({ message: 'File too large. Maximum size is 100MB.' });
