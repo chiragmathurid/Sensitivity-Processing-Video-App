@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';  // ← your configured axios instance
+import { joinUserRoom } from '../hooks/useAnalysisSocket';
 
 function Login() {
   const [email,    setEmail]    = useState('');
@@ -18,6 +19,8 @@ function Login() {
       localStorage.setItem('token', data.token);          // save the token
       localStorage.setItem('user',  JSON.stringify(data.user)); // save user info
       // ────────────────────────────────────────────────────────
+
+      joinUserRoom(data.user.id); // ← join their private socket room
 
       navigate('/dashboard'); // redirect after login
     } catch (err) {

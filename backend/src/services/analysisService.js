@@ -60,78 +60,56 @@ function getVideoMetadata(filepath) {
 // filepath = absolute path to the saved file
 // originalName = original filename (for keyword checking)
 
-const analyzeVideo = async (io, videoId, filepath, originalName) => {
-    try {
-        // ── Stage 1: Mark as processing ──────────────────────────────────────────
-        await Video.findByIdAndUpdate(videoId, { status: 'processing' });
-        io.emit('analysis:progress', {
-            videoId,
-            percent: 10,
-            message: 'Starting analysis...'
-        });
+// At the top of analyzeVideo, accept the uploaderId
+const analyzeVideo = async (io, videoId, filepath, originalName, uploaderId) => {
 
-        // ── Stage 2: Extract metadata with FFprobe ────────────────────────────────
+    // Helper — emit only to the user who uploaded this video
+    const emitProgress = (percent, message, extra = {}) => {
+        io.to(uploaderId.toString()).emit('analysis:progress', {
+            videoId,
+            percent,
+            message,
+            ...extra
+        });
+    };
+
+    try {
+        await Video.findByIdAndUpdate(videoId, { status: 'processing' });
+        emitProgress(10, 'Starting analysis...');
+
         let metadata = {};
         try {
             metadata = await getVideoMetadata(filepath);
-            // Save duration to the video document
             await Video.findByIdAndUpdate(videoId, { duration: metadata.duration });
-        } catch (ffmpegErr) {
-            // FFprobe failed — log it but continue with what we have
-            console.warn('FFprobe error (continuing):', ffmpegErr.message);
+        } catch (err) {
+            console.warn('FFprobe error:', err.message);
         }
 
-        io.emit('analysis:progress', {
-            videoId,
-            percent: 40,
-            message: 'Metadata extracted...'
-        });
+        emitProgress(40, 'Metadata extracted...');
+        await new Promise(r => setTimeout(r, 1500));
 
-        // Simulate processing time so the progress bar is visible
-        await new Promise(resolve => setTimeout(resolve, 1500));
-
-        // ── Stage 3: Calculate sensitivity score ─────────────────────────────────
         let score = 0;
         score += scoreByFilename(originalName);
         score += scoreByDuration(metadata.duration || 0);
         score += scoreByFileSize(metadata.size || 0);
 
-        io.emit('analysis:progress', {
-            videoId,
-            percent: 75,
-            message: 'Analysing content...'
-        });
+        emitProgress(75, 'Analysing content...');
+        await new Promise(r => setTimeout(r, 1000));
 
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        // ── Stage 4: Final verdict ────────────────────────────────────────────────
         const finalStatus = score > 50 ? 'flagged' : 'safe';
+        await Video.findByIdAndUpdate(videoId, { status: finalStatus });
 
-        await Video.findByIdAndUpdate(videoId, {
-            status: finalStatus,
-            // Optionally store the score for debugging
-        });
-
-        io.emit('analysis:progress', {
-            videoId,
-            percent: 100,
-            message: `Analysis complete — ${finalStatus}`,
+        emitProgress(100, `Analysis complete — ${finalStatus}`, {
             status: finalStatus,
             done: true
         });
-
-        console.log(`Video ${videoId} → ${finalStatus} (score: ${score})`);
 
     } catch (err) {
-        // If anything goes wrong, mark as flagged (fail safe)
         console.error('Analysis error:', err);
         await Video.findByIdAndUpdate(videoId, { status: 'flagged' });
-        io.emit('analysis:progress', {
-            videoId,
-            percent: 100,
-            message: 'Analysis failed — marked for review',
-            status: 'flagged',
-            done: true
+        io.to(uploaderId.toString()).emit('analysis:progress', {
+            videoId, percent: 100, message: 'Analysis failed',
+            status: 'flagged', done: true
         });
     }
 };

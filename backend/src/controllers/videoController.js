@@ -1,6 +1,6 @@
 const Video = require('../models/Video');
-const path  = require('path');
-const fs    = require('fs');
+const path = require('path');
+const fs = require('fs');
 
 const { analyzeVideo } = require('../services/analysisService');
 
@@ -15,12 +15,12 @@ exports.uploadVideo = async (req, res) => {
     // req.user is populated by the protect middleware from Phase 2
     const video = await Video.create({
       originalName: req.file.originalname,
-      filename:     req.file.filename,
-      filepath:     req.file.path,
-      size:         req.file.size,
-      mimetype:     req.file.mimetype,
-      uploader:     req.user._id,
-      status:       'pending'
+      filename: req.file.filename,
+      filepath: req.file.path,
+      size: req.file.size,
+      mimetype: req.file.mimetype,
+      uploader: req.user._id,
+      status: 'pending'
     });
 
     // ── Respond immediately — don't make the user wait ─────────────────────
@@ -29,10 +29,10 @@ exports.uploadVideo = async (req, res) => {
     // ── THEN kick off analysis in the background ───────────────────────────
     // Notice: no 'await' here — this runs after the response is already sent
     const io = req.app.get('io');
-    analyzeVideo(io, video._id, video.filepath, video.originalName);
+    analyzeVideo(io, video._id, video.filepath, video.originalName, req.user._id); 
 
   } catch (err) {
-    if (req.file) fs.unlink(req.file.path, () => {});
+    if (req.file) fs.unlink(req.file.path, () => { });
     res.status(500).json({ message: err.message });
   }
 };
@@ -41,7 +41,7 @@ exports.uploadVideo = async (req, res) => {
 exports.getVideos = async (req, res) => {
   try {
     const videos = await Video.find({ uploader: req.user._id })
-                              .sort({ createdAt: -1 }); // newest first
+      .sort({ createdAt: -1 }); // newest first
     res.json(videos);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -52,7 +52,7 @@ exports.getVideos = async (req, res) => {
 exports.getVideoById = async (req, res) => {
   try {
     const video = await Video.findOne({
-      _id:      req.params.id,
+      _id: req.params.id,
       uploader: req.user._id  // prevents users seeing each other's videos
     });
 

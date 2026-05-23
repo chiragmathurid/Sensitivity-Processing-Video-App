@@ -41,10 +41,20 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'Server is running', time: new Date() });
 });
 
-// Socket.io connection (Phase 5 will expand this)
+// Socket.io connection 
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
-  socket.on('disconnect', () => console.log('Client disconnected:', socket.id));
+
+  // When a user logs in on the frontend, they join their own private room
+  // The room name is simply their MongoDB user ID
+  socket.on('join:room', (userId) => {
+    socket.join(userId); // join a room named after this user's ID
+    console.log(`Socket ${socket.id} joined room: ${userId}`);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('Client disconnected:', socket.id);
+  });
 });
 
 const PORT = process.env.PORT || 8000;

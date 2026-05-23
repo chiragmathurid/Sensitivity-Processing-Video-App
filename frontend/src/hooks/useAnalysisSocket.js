@@ -1,21 +1,38 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 
-// Create ONE socket connection for the whole app
-const socket = io('http://localhost:8000');
+// Singleton socket — one connection for the whole app lifetime
+let socket = null;
 
-export const useAnalysisSocket = (onProgress) => {
-    useEffect(() => {
-        // Listen for progress events from the backend
-        socket.on('analysis:progress', (data) => {
-            onProgress(data);
-            // data = { videoId, percent, message, status?, done? }
-        });
-
-        return () => {
-            socket.off('analysis:progress'); // clean up when component unmounts
-        };
-    }, [onProgress]);
+const getSocket = () => {
+  if (!socket) {
+    socket = io('http://localhost:8000', {
+      reconnection:        true,   // auto-reconnect if connection drops
+      reconnectionAttempts: 5,
+      reconnectionDelay:   1000,
+    });
+  }
+  return socket;
 };
 
-export default socket;
+// Call this once when the user logs in — joins their private room
+export const joinUserRoom = (userId) => {
+  getSocket().emit('join:room', userId);
+};
+
+// Hook used by any component that wants to listen for progress
+export const useAnalysisSocket = (onProgress) => {
+  const callbackRef = useRef(onProgress);
+  callbackRef.current = onProgress; // keep ref fresh without re-subscribing
+
+  useEffect(() => {
+    const s = getSocket();
+
+    const handler = (data) => callbackRef.current(data);
+    s.on('analysis:progress', handler);
+
+    return () => s.off('analysis:progress', handler);
+  }, []); // empty deps — subscribe once, never resubscribe
+};
+
+export default getSocket;
