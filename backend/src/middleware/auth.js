@@ -1,21 +1,28 @@
-const jwt  = require('jsonwebtoken');
+const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
 // Verifies the JWT — attach user to req so controllers can use it
 exports.protect = async (req, res, next) => {
-  const authHeader = req.headers.authorization;
+  let token;
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  // Check Authorization header first (used by Axios)
+  if (req.headers.authorization?.startsWith('Bearer ')) {
+    token = req.headers.authorization.split(' ')[1];
+  }
+  // Fallback: check query string (used by <video> src)
+  else if (req.query.token) {
+    token = req.query.token;
+  }
+
+  if (!token) {
     return res.status(401).json({ message: 'No token — please log in' });
   }
 
-  const token = authHeader.split(' ')[1]; // "Bearer <token>" → grab just the token
-
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = await User.findById(decoded.id).select('-password'); // attach user, strip pw
-    next(); // hand off to the next middleware or controller
-  } catch (err) {
+    req.user = await User.findById(decoded.id).select('-password');
+    next();
+  } catch {
     return res.status(401).json({ message: 'Token invalid or expired' });
   }
 };
@@ -23,8 +30,8 @@ exports.protect = async (req, res, next) => {
 // Checks user role — use AFTER protect
 exports.requireRole = (...roles) => (req, res, next) => {
   if (!roles.includes(req.user.role)) {
-    return res.status(403).json({ 
-      message: `Access denied. Required: ${roles.join(' or ')}` 
+    return res.status(403).json({
+      message: `Access denied. Required: ${roles.join(' or ')}`
     });
   }
   next();

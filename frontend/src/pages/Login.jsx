@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';  // ← your configured axios instance
 import { joinUserRoom } from '../hooks/useAnalysisSocket';
+import { useAuth } from '../context/AuthContext';
 
 function Login() {
-  const [email,    setEmail]    = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error,    setError]    = useState('');
+  const [error, setError] = useState('');
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -16,8 +18,7 @@ function Login() {
       const { data } = await api.post('/auth/login', { email, password });
 
       // ── Step 7 code lives exactly here ──────────────────────
-      localStorage.setItem('token', data.token);          // save the token
-      localStorage.setItem('user',  JSON.stringify(data.user)); // save user info
+      login(data.token, data.user);
       // ────────────────────────────────────────────────────────
 
       joinUserRoom(data.user.id); // ← join their private socket room

@@ -1,51 +1,55 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { useAuth } from './context/AuthContext';
+import Navbar from './components/Navbar';
+import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import ProtectedRoute from './components/ProtectedRoute';
 import Dashboard from './pages/Dashboard';
-import Upload from './pages/Upload';
-import { useEffect } from 'react';
-import { joinUserRoom } from './hooks/useAnalysisSocket';
 import VideoLibrary from './pages/VideoLibrary';
+import Upload from './pages/Upload';
+import VideoPlayer from './pages/VideoPlayer';
 
 function App() {
-  useEffect(() => {
-    // If user is already logged in (page refresh), re-join their room
-    const user = JSON.parse(localStorage.getItem('user') || 'null');
-    if (user?.id) {
-      joinUserRoom(user.id);
-    }
-  }, []);
+  const { isLoggedIn } = useAuth();
 
   return (
-    <Routes>
-      {/* Public routes — anyone can visit */}
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
+    <>
+      <Navbar />
+      <Routes>
+        {/* Public routes */}
+        <Route path="/login" element={isLoggedIn ? <Navigate to="/dashboard" /> : <Login />} />
+        <Route path="/register" element={isLoggedIn ? <Navigate to="/dashboard" /> : <Register />} />
 
-      {/* Protected routes — redirect to /login if no token */}
-      <Route path="/dashboard" element={
-        <ProtectedRoute>
-          <Dashboard />
-        </ProtectedRoute>
-      } />
+        {/* Protected routes */}
+        <Route path="/dashboard" element={
+          <ProtectedRoute>
+            <Dashboard />
+          </ProtectedRoute>}
+        />
 
-      <Route path="/upload" element={
-        <ProtectedRoute>
-          <Upload />
-        </ProtectedRoute>
-      } />
+        <Route path="/library" element={
+          <ProtectedRoute>
+            <VideoLibrary />
+          </ProtectedRoute>}
+        />
 
-      <Route path="/library" element={
-        <ProtectedRoute>
-          <VideoLibrary />
-        </ProtectedRoute>
-      } />
+        <Route path="/upload" element={
+          <ProtectedRoute>
+            <Upload />
+          </ProtectedRoute>}
+        />
 
-      {/* Catch-all */}
-      <Route path="/" element={<Navigate to="/login" />} />
-      <Route path="*" element={<Navigate to="/login" />} />
-    </Routes>
+        <Route path="/player/:id" element={
+          <ProtectedRoute>
+            <VideoPlayer />
+          </ProtectedRoute>}
+        />
+
+        {/* Catch-all */}
+        <Route path="/" element={<Navigate to={isLoggedIn ? '/dashboard' : '/login'} />} />
+        <Route path="*" element={<Navigate to={isLoggedIn ? '/dashboard' : '/login'} />} />
+      </Routes>
+    </>
   );
 }
 

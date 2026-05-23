@@ -6,8 +6,11 @@ const {
     uploadVideo,
     getVideos,
     getVideoById,
-    deleteVideo
+    deleteVideo,
+    streamVideo 
 } = require('../controllers/videoController');
+
+router.get('/stream/:id', protect, streamVideo);
 
 // GET  /api/videos          — any logged-in user
 router.get('/', protect, getVideos);

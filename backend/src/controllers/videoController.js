@@ -80,3 +80,84 @@ exports.deleteVideo = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+// GET /api/videos/stream/:id
+exports.streamVideo = async (req, res) => {
+  try {
+    // Find the video — only allow the owner to stream it
+    const video = await Video.findOne({
+      _id:      req.params.id,
+      uploader: req.user._id
+    });
+
+    if (!video) {
+      return res.status(404).json({ message: 'Video not found' });
+    }
+
+    // Only allow streaming of safe videos
+    if (video.status === 'flagged') {
+      return res.status(403).json({ message: 'This video has been flagged and cannot be played' });
+    }
+
+    if (video.status === 'pending' || video.status === 'processing') {
+      return res.status(425).json({ message: 'Video is still being processed' });
+    }
+
+    const filepath = video.filepath;
+
+    // Check the file actually exists on disk
+    if (!fs.existsSync(filepath)) {
+      return res.status(404).json({ message: 'Video file not found on server' });
+    }
+
+    const stat     = fs.statSync(filepath);
+    const fileSize = stat.size;
+    const range    = req.headers.range; // e.g. "bytes=0-1048576"
+
+    if (!range) {
+      // No range header — send the whole file (fallback)
+      res.writeHead(200, {
+        'Content-Length': fileSize,
+        'Content-Type':   video.mimetype || 'video/mp4',
+      });
+      fs.createReadStream(filepath).pipe(res);
+      return;
+    }
+
+    // ── Parse the Range header ────────────────────────────────────────────────
+    const parts    = range.replace(/bytes=/, '').split('-');
+    const start    = parseInt(parts[0], 10);
+    const end      = parts[1] ? parseInt(parts[1], 10) : Math.min(start + 1024 * 1024, fileSize - 1);
+    // 1MB chunks — good balance between memory use and buffering
+
+    // Validate range values
+    if (start >= fileSize || end >= fileSize) {
+      res.status(416).set('Content-Range', `bytes */${fileSize}`).end();
+      return;
+    }
+
+    const chunkSize = end - start + 1;
+
+    // ── Send partial content response ─────────────────────────────────────────
+    res.writeHead(206, {  // 206 = Partial Content (NOT 200)
+      'Content-Range':  `bytes ${start}-${end}/${fileSize}`,
+      'Accept-Ranges':  'bytes',
+      'Content-Length': chunkSize,
+      'Content-Type':   video.mimetype || 'video/mp4',
+    });
+
+    // Stream just that chunk from disk — never load the whole file into memory
+    const stream = fs.createReadStream(filepath, { start, end });
+    stream.pipe(res);
+
+    stream.on('error', (err) => {
+      console.error('Stream error:', err);
+      if (!res.headersSent) {
+        res.status(500).json({ message: 'Streaming error' });
+      }
+    });
+
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
