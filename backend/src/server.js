@@ -6,32 +6,30 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
 const connectDB = require('./config/db');
-const authRoutes = require('./routes/authRoutes');
 const multer = require('multer');
 
-dotenv.config(); // load .env variables FIRST before anything else reads them
-connectDB();     // connect to MongoDB
+dotenv.config();
+connectDB();
 
 const app = express();
-const server = http.createServer(app); // wrap express in http.Server for Socket.io
+const server = http.createServer(app);
+
+// ✅ Socket.io — uses env variable for production
+const allowedOrigins = [
+  'http://localhost:5173',
+  process.env.CLIENT_URL,
+].filter(Boolean);
 
 const io = new Server(server, {
-  cors: { origin: 'http://localhost:5173', methods: ['GET', 'POST'] }
-  // 5173 is Vite's default port — this allows the frontend to connect
+  cors: { origin: allowedOrigins, methods: ['GET', 'POST'] }
 });
 
-// Make `io` available inside route controllers later
 app.set('io', io);
 
-// Middleware
+// ✅ CORS middleware
 app.use(cors({
   origin: function (origin, callback) {
-    const allowed = [
-      'http://localhost:5173',
-      process.env.CLIENT_URL,
-    ].filter(Boolean);
-
-    if (!origin || allowed.includes(origin)) {
+    if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
@@ -40,30 +38,28 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(express.json());                             // parse JSON request bodies
-app.use(express.urlencoded({ extended: true }));     // parse form data
-app.use('/api/auth', authRoutes);
+// ✅ Body parsers BEFORE routes
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Serve uploaded video files as static files
+// ✅ Static files
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
-// Routes (you'll add more here as you build each phase)
+// ✅ Routes — mounted ONCE each
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/videos', require('./routes/videoRoutes'));
 
-// Health check — visit http://localhost:8000/api/health to confirm it's running
+// Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'Server is running', time: new Date() });
 });
 
-// Socket.io connection 
+// Socket.io
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
 
-  // When a user logs in on the frontend, they join their own private room
-  // The room name is simply their MongoDB user ID
   socket.on('join:room', (userId) => {
-    socket.join(userId); // join a room named after this user's ID
+    socket.join(userId);
     console.log(`Socket ${socket.id} joined room: ${userId}`);
   });
 
@@ -72,8 +68,7 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 8000;
-
+// ✅ Error handler — must be last
 app.use((err, req, res, next) => {
   console.error('FULL ERROR:', err);
 
@@ -92,4 +87,5 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: 'Something went wrong on the server' });
 });
 
+const PORT = process.env.PORT || 8000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
