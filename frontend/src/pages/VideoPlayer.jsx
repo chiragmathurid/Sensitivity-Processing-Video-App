@@ -67,7 +67,7 @@ function VideoPlayer() {
                 <video
                     controls
                     width="100%"
-                    style={{ borderRadius: 8, marginTop: 16, background: '#000' }}
+                    style={{ borderRadius: 8, marginTop: 16, background: '#000', maxHeight: '480px', objectFit: 'contain', }}
                     src={streamUrl}
                 >
                     Your browser does not support video playback.
