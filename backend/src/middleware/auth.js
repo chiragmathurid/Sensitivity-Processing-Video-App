@@ -3,15 +3,14 @@ const User = require('../models/User');
 
 // Verifies the JWT — attach user to req so controllers can use it
 exports.protect = async (req, res, next) => {
+  // Check Authorization header first, then fall back to ?token= query param
   let token;
 
-  // Check Authorization header first (used by Axios)
-  if (req.headers.authorization?.startsWith('Bearer ')) {
-    token = req.headers.authorization.split(' ')[1];
-  }
-  // Fallback: check query string (used by <video> src)
-  else if (req.query.token) {
-    token = req.query.token;
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
+  } else if (req.query.token) {
+    token = req.query.token;   // ← ADD: for <video> streaming requests
   }
 
   if (!token) {
@@ -22,7 +21,7 @@ exports.protect = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = await User.findById(decoded.id).select('-password');
     next();
-  } catch {
+  } catch (err) {
     return res.status(401).json({ message: 'Token invalid or expired' });
   }
 };

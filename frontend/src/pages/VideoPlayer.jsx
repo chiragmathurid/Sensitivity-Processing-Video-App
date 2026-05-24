@@ -22,7 +22,8 @@ function VideoPlayer() {
     // Build the streaming URL — include the token in the query string
     // because <video> src can't set custom headers
     const token = localStorage.getItem('token');
-    const streamUrl = `http://localhost:8000/api/videos/stream/${id}?token=${token}`;
+    const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:8000';
+    const streamUrl = `${baseUrl}/api/videos/stream/${id}?token=${token}`;
 
     const statusColor = { safe: 'green', flagged: 'red', processing: 'orange' };
 
