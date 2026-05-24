@@ -10,7 +10,9 @@ const getSocket = () => {
       reconnection: true,   // auto-reconnect if connection drops
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
-    });
+      transports: ['websocket', 'polling'], 
+      withCredentials: true, 
+    }); 
   }
   return socket;
 };

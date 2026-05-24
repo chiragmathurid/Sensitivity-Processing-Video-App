@@ -1,10 +1,15 @@
 const ffmpeg = require('fluent-ffmpeg');
+const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');      // ← ADD
+const ffprobeInstaller = require('@ffprobe-installer/ffprobe');
 const path = require('path');
 const Video = require('../models/Video');
 
 // ─── Sensitivity scoring rules ───────────────────────────────────────────────
 // Each rule adds points to a "risk score". Score > 50 = flagged.
 // This is a heuristic system — you can make it as sophisticated as you like.
+
+ffmpeg.setFfmpegPath(ffmpegInstaller.path);                       // ← ADD
+ffmpeg.setFfprobePath(ffprobeInstaller.path);
 
 const FLAGGED_KEYWORDS = [
     'violence', 'adult', 'explicit', 'nsfw', 'gore',
@@ -107,7 +112,7 @@ const analyzeVideo = async (io, videoId, filepath, originalName, uploaderId) => 
     } catch (err) {
         console.error('Analysis error:', err);
         await Video.findByIdAndUpdate(videoId, { status: 'flagged' });
-        io.to(uploaderId.toString()).emit('analysis:progress', {
+        io.to(uploaderId.toString()).emit('analysis:ffmpeg', {
             videoId, percent: 100, message: 'Analysis failed',
             status: 'flagged', done: true
         });
