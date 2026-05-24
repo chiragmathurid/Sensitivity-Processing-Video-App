@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import api from '../api/axios';  // ← your configured axios instance
 import { joinUserRoom } from '../hooks/useAnalysisSocket';
 import { useAuth } from '../context/AuthContext';
@@ -50,6 +50,11 @@ function Login() {
         />
         <button type="submit">Login</button>
       </form>
+
+      <p style={{ marginTop: 16, fontSize: 14 }}>
+        Don't have an account?{' '}
+        <Link to="/register" style={{ color: '#1D9E75' }}>Register here</Link>
+      </p>
     </div>
   );
 }

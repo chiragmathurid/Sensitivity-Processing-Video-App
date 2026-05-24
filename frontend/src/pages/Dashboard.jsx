@@ -23,7 +23,7 @@ function Dashboard() {
     { label: 'Total videos', value: stats.total, color: 'var(--color-text-primary)' },
     { label: 'Safe', value: stats.safe, color: 'var(--color-text-success)' },
     { label: 'Flagged', value: stats.flagged, color: 'var(--color-text-danger)' },
-    { label: 'Processing', value: stats.processing, color: 'var(--color-text-warning)' },
+    { label: 'Pending', value: stats.processing, color: 'var(--color-text-warning)' },
   ];
 
   return (
